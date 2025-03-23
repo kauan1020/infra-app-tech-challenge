@@ -70,7 +70,7 @@ jobs:
         run: exit 1
 
       - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: terraform-plan
           path: tfplan
@@ -102,7 +102,7 @@ jobs:
         run: terraform init
 
       - name: Download Terraform Plan
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v2
         with:
           name: terraform-plan
 
