@@ -62,19 +62,12 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color
         continue-on-error: true
 
       - name: Terraform Plan Status
         if: steps.plan.outcome == 'failure'
         run: exit 1
-
-      - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v2
-        with:
-          name: terraform-plan
-          path: tfplan
-          retention-days: 5
 
   apply:
     name: Apply Infrastructure Changes
@@ -101,13 +94,8 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Download Terraform Plan
-        uses: actions/download-artifact@v2
-        with:
-          name: terraform-plan
-
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
 
       - name: Output Cluster Info
         run: |
