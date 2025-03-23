@@ -34,58 +34,29 @@ data "aws_iam_role" "lab_role" {
   name = var.iam_role_name
 }
 
-resource "aws_security_group" "eks_cluster_sg" {
-  name        = "${var.project_name}-eks-cluster-sg"
-  description = "Security group for EKS cluster to communicate with worker nodes"
-  vpc_id      = data.aws_vpc.existing_vpc.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-eks-cluster-sg"
-  }
+# Referência aos Security Groups existentes em vez de criar novos
+data "aws_security_group" "eks_cluster_sg" {
+  name   = "${var.project_name}-eks-cluster-sg"
+  vpc_id = data.aws_vpc.existing_vpc.id
 }
 
-resource "aws_security_group" "eks_rds_sg" {
-  name        = "${var.project_name}-eks-rds-sg"
-  description = "Security group for EKS to RDS communication"
-  vpc_id      = data.aws_vpc.existing_vpc.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    self        = true
-    description = "PostgreSQL access from within the security group"
-  }
-
-  tags = {
-    Name = "${var.project_name}-eks-rds-sg"
-  }
+data "aws_security_group" "eks_rds_sg" {
+  name   = "${var.project_name}-eks-rds-sg"
+  vpc_id = data.aws_vpc.existing_vpc.id
 }
 
 data "aws_security_group" "postgres_sg" {
   id = var.postgres_sg_id
 }
 
+# A regra de security group também pode já existir, então podemos condicionalmente criá-la
 resource "aws_security_group_rule" "eks_to_postgres_sg" {
+  count                    = var.create_sg_rule ? 1 : 0
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.eks_cluster_sg.id
+  source_security_group_id = data.aws_security_group.eks_cluster_sg.id
   security_group_id        = data.aws_security_group.postgres_sg.id
   description              = "Allow PostgreSQL access from EKS cluster"
 }
@@ -137,13 +108,9 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   role_arn = data.aws_iam_role.lab_role.arn
 
   vpc_config {
-    subnet_ids = slice(local.filtered_subnets, 0, min(2, length(local.filtered_subnets)))
-    security_group_ids = [aws_security_group.eks_cluster_sg.id]
+    subnet_ids         = slice(local.filtered_subnets, 0, min(2, length(local.filtered_subnets)))
+    security_group_ids = [data.aws_security_group.eks_cluster_sg.id]
   }
-
-  depends_on = [
-    aws_security_group.eks_cluster_sg
-  ]
 }
 
 resource "aws_eks_node_group" "tech_node_group" {

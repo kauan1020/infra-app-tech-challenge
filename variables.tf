@@ -13,7 +13,7 @@ variable "vpc_id" {
 variable "subnet_ids" {
   description = "List of subnet IDs"
   type        = list(string)
-  default     = [
+  default = [
     "subnet-08dbed1e92dd69532",
     "subnet-01ec3dff60a3e42d6",
     "subnet-0eb850c74a8a2cc68",
@@ -69,4 +69,16 @@ variable "min_capacity" {
   description = "Minimum number of worker nodes"
   type        = number
   default     = 1
+}
+
+variable "create_eks_rds_sg" {
+  description = "Whether to create the EKS RDS security group"
+  type        = bool
+  default     = false
+}
+
+variable "create_sg_rule" {
+  description = "Whether to create the security group rule for PostgreSQL access"
+  type        = bool
+  default     = false
 }
