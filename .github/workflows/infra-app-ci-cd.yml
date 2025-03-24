@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload Terraform Plan
         if: env.PLAN_EXIT_CODE == '2'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: terraform-plan
           path: tfplan
