@@ -129,4 +129,3 @@ resource "aws_eks_node_group" "tech_node_group" {
 
   depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
-
