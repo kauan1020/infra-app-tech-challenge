@@ -99,4 +99,3 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
     ]
   }
 }
-
