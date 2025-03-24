@@ -69,17 +69,12 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Refresh State
+        run: terraform refresh
+
       - name: Terraform Plan
         id: plan
-        run: terraform plan -detailed-exitcode -out=tfplan
-        continue-on-error: true
-
-      - name: Save Plan Exit Code
-        run: echo "PLAN_EXIT_CODE=${{ steps.plan.outcome == 'success' && steps.plan.outputs.exitcode || 1 }}" >> $GITHUB_ENV
-
-      - name: Save Plan Output
-        if: steps.plan.outputs.exitcode == '2'
-        run: terraform show -no-color tfplan > tfplan.txt
+        run: terraform plan -out=tfplan
 
   apply:
     name: Apply Infrastructure Changes
@@ -107,23 +102,16 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Check for Changes
-        id: plan_check
-        run: |
-          terraform plan -detailed-exitcode || echo "PLAN_HAS_CHANGES=true" >> $GITHUB_ENV
+      - name: Terraform Refresh State
+        run: terraform refresh
 
       - name: Terraform Apply
-        if: env.PLAN_HAS_CHANGES == 'true'
         run: terraform apply -auto-approve
-
-      - name: No Changes Notification
-        if: env.PLAN_HAS_CHANGES != 'true'
-        run: echo "No changes detected. Infrastructure is up to date."
 
       - name: Output Cluster Info
         run: |
-          CLUSTER_NAME=$(terraform output -json eks_cluster_name 2>/dev/null | tr -d '"' || echo "tech-eks-cluster")
-          REGION=$(terraform output -json region 2>/dev/null | tr -d '"' || echo "us-east-1")
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name 2>/dev/null || echo "tech-eks-cluster")
+          REGION=$(terraform output -raw region 2>/dev/null || echo "us-east-1")
           
           echo "EKS Cluster Name: $CLUSTER_NAME"
           echo "Region: $REGION"
