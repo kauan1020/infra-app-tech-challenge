@@ -52,7 +52,7 @@ variable "desired_capacity" {
 
 variable "max_capacity" {
   type    = number
-  default = 3
+  default = 2
 }
 
 variable "min_capacity" {
