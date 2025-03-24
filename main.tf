@@ -93,9 +93,10 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
     ignore_changes = [
       vpc_config,
     ]
   }
 }
+
