@@ -87,30 +87,28 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
     Environment = "Production"
     Project     = var.project_name
     ManagedBy   = "Terraform"
-    UpdatedAt   = "2025-03-24"
+    UpdatedAt   = "2025-03-25"
+    TestTag     = "TestValue"
   }
 
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
       vpc_config,
-      tags,
     ]
   }
 }
 
-data "aws_eks_node_groups" "existing_node_groups" {
-  cluster_name = aws_eks_cluster.tech_eks_cluster.name
-}
-
-locals {
-  node_group_exists = contains(try(data.aws_eks_node_groups.existing_node_groups.names, []), "${var.project_name}-node-group")
-}
-
-resource "aws_eks_node_group" "tech_node_group" {
-  count           = local.node_group_exists ? 0 : 1
+# Usando data source para buscar o node group existente
+data "aws_eks_node_group" "existing_node_group" {
   cluster_name    = aws_eks_cluster.tech_eks_cluster.name
   node_group_name = "${var.project_name}-node-group"
+}
+
+# Recurso para modificar tags no node group existente
+resource "aws_eks_node_group" "update_tags_only" {
+  cluster_name    = aws_eks_cluster.tech_eks_cluster.name
+  node_group_name = data.aws_eks_node_group.existing_node_group.node_group_name
   node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = local.filtered_subnets
   instance_types  = [var.instance_type]
@@ -124,19 +122,23 @@ resource "aws_eks_node_group" "tech_node_group" {
   capacity_type = "ON_DEMAND"
 
   update_config {
-    max_unavailable = 1
+    max_unavailable = 2
   }
 
   tags = {
     Environment = "Production"
     Project     = var.project_name
     ManagedBy   = "Terraform"
-    UpdatedAt   = "2025-03-24"
+    UpdatedAt   = "2025-03-25"
+    TestTag     = "TestValue"
   }
 
-
+  lifecycle {
+    ignore_changes = [
+      scaling_config,
+    ]
+  }
 
   depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
-
 
