@@ -84,7 +84,7 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   }
 
   tags = {
-    Environment = "Production"
+    Environment = "Dev"
     Project     = var.project_name
     ManagedBy   = "Terraform"
     UpdatedAt   = "2025-03-25"
