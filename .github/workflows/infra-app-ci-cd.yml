@@ -77,12 +77,9 @@ jobs:
       - name: Save Plan Exit Code
         run: echo "PLAN_EXIT_CODE=${{ steps.plan.outcome == 'success' && steps.plan.outputs.exitcode || 1 }}" >> $GITHUB_ENV
 
-      - name: Upload Terraform Plan
-        if: env.PLAN_EXIT_CODE == '2'
-        uses: actions/upload-artifact@v2
-        with:
-          name: terraform-plan
-          path: tfplan
+      - name: Save Plan Output
+        if: steps.plan.outputs.exitcode == '2'
+        run: terraform show -no-color tfplan > tfplan.txt
 
   apply:
     name: Apply Infrastructure Changes
