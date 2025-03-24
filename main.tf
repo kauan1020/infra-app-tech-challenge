@@ -134,12 +134,7 @@ resource "aws_eks_node_group" "tech_node_group" {
     UpdatedAt   = "2025-03-24"
   }
 
-  lifecycle {
-    ignore_changes = [
-      scaling_config,
-      tags,
-    ]
-  }
+
 
   depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
