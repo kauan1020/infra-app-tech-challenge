@@ -74,19 +74,7 @@ locals {
   ]
 }
 
-data "aws_eks_clusters" "existing_clusters" {}
-
-locals {
-  cluster_exists = contains(data.aws_eks_clusters.existing_clusters.names, var.cluster_name)
-}
-
-data "aws_eks_cluster" "existing_cluster" {
-  count = local.cluster_exists ? 1 : 0
-  name  = var.cluster_name
-}
-
 resource "aws_eks_cluster" "tech_eks_cluster" {
-  count    = local.cluster_exists ? 0 : 1
   name     = var.cluster_name
   role_arn = data.aws_iam_role.lab_role.arn
 
@@ -96,6 +84,7 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   }
 
   lifecycle {
+    prevent_destroy = true
     ignore_changes = [
       vpc_config,
       tags,
@@ -103,23 +92,17 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   }
 }
 
-locals {
-  cluster_name     = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].name : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].name : var.cluster_name)
-  cluster_endpoint = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].endpoint : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].endpoint : "")
-}
-
 data "aws_eks_node_groups" "existing_node_groups" {
-  count        = local.cluster_exists ? 1 : 0
-  cluster_name = local.cluster_name
+  cluster_name = aws_eks_cluster.tech_eks_cluster.name
 }
 
 locals {
-  node_group_exists = local.cluster_exists ? contains(try(data.aws_eks_node_groups.existing_node_groups[0].names, []), "${var.project_name}-node-group") : false
+  node_group_exists = contains(try(data.aws_eks_node_groups.existing_node_groups.names, []), "${var.project_name}-node-group")
 }
 
 resource "aws_eks_node_group" "tech_node_group" {
   count           = local.node_group_exists ? 0 : 1
-  cluster_name    = local.cluster_name
+  cluster_name    = aws_eks_cluster.tech_eks_cluster.name
   node_group_name = "${var.project_name}-node-group"
   node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = local.filtered_subnets
@@ -146,3 +129,4 @@ resource "aws_eks_node_group" "tech_node_group" {
 
   depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
+

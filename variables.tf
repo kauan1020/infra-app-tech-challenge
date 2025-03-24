@@ -59,3 +59,4 @@ variable "min_capacity" {
   type    = number
   default = 1
 }
+
