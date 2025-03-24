@@ -15,6 +15,6 @@ output "kubeconfig_update_command" {
 }
 
 output "cluster_endpoint" {
-  value = aws_eks_cluster.tech_eks_cluster.endpoint
+  value       = aws_eks_cluster.tech_eks_cluster.endpoint
   description = "Endpoint for the Kubernetes API server"
 }
