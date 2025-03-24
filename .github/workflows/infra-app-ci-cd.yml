@@ -39,11 +39,7 @@ jobs:
 
       - name: Terraform Init
         id: init
-        run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-          terraform init
+        run: terraform init
 
       - name: Terraform Validate
         id: validate
@@ -71,22 +67,22 @@ jobs:
           terraform_version: 1.5.7
 
       - name: Terraform Init
-        run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-          terraform init
+        run: terraform init
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color
+        run: terraform plan -detailed-exitcode -out=tfplan
         continue-on-error: true
 
-      - name: Check for plan errors
-        if: steps.plan.outcome == 'failure'
-        run: |
-          echo "Terraform plan had errors but we'll continue to apply."
-          echo "This is a defensive measure to handle pre-existing resources."
+      - name: Save Plan Exit Code
+        run: echo "PLAN_EXIT_CODE=${{ steps.plan.outcome == 'success' && steps.plan.outputs.exitcode || 1 }}" >> $GITHUB_ENV
+
+      - name: Upload Terraform Plan
+        if: env.PLAN_EXIT_CODE == '2'
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: tfplan
 
   apply:
     name: Apply Infrastructure Changes
@@ -112,18 +108,20 @@ jobs:
           terraform_version: 1.5.7
 
       - name: Terraform Init
+        run: terraform init
+
+      - name: Check for Changes
+        id: plan_check
         run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-          terraform init
+          terraform plan -detailed-exitcode || echo "PLAN_HAS_CHANGES=true" >> $GITHUB_ENV
 
       - name: Terraform Apply
-        run: |
-          # Tentar aplicar normalmente
-          terraform apply -auto-approve || echo "Apply tinha erros, mas vamos tentar com -refresh=false"
-          
-          terraform apply -auto-approve -refresh=false || echo "Segunda tentativa falhou também - o pipeline continuará"
+        if: env.PLAN_HAS_CHANGES == 'true'
+        run: terraform apply -auto-approve
+
+      - name: No Changes Notification
+        if: env.PLAN_HAS_CHANGES != 'true'
+        run: echo "No changes detected. Infrastructure is up to date."
 
       - name: Output Cluster Info
         run: |
@@ -132,8 +130,5 @@ jobs:
           
           echo "EKS Cluster Name: $CLUSTER_NAME"
           echo "Region: $REGION"
-          echo ""
           echo "To connect to this cluster:"
           echo "aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME"
-          echo ""
-          echo "The application team can now deploy to this cluster using their CI/CD pipeline."

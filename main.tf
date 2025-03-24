@@ -42,7 +42,6 @@ data "aws_iam_role" "lab_role" {
   name = var.iam_role_name
 }
 
-# Usando data sources para todos os security groups existentes
 data "aws_security_group" "eks_cluster_sg" {
   name   = "${var.project_name}-eks-cluster-sg"
   vpc_id = data.aws_vpc.existing_vpc.id
@@ -57,40 +56,16 @@ data "aws_security_group" "postgres_sg" {
   id = var.postgres_sg_id
 }
 
-data "aws_subnet" "subnet1_data" {
-  id = data.aws_subnet.subnet1.id
-}
-
-data "aws_subnet" "subnet2_data" {
-  id = data.aws_subnet.subnet2.id
-}
-
-data "aws_subnet" "subnet3_data" {
-  id = data.aws_subnet.subnet3.id
-}
-
-data "aws_subnet" "subnet4_data" {
-  id = data.aws_subnet.subnet4.id
-}
-
-data "aws_subnet" "subnet5_data" {
-  id = data.aws_subnet.subnet5.id
-}
-
-data "aws_subnet" "subnet6_data" {
-  id = data.aws_subnet.subnet6.id
-}
-
 locals {
   supported_azs = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
 
   subnet_az_map = {
-    "${data.aws_subnet.subnet1.id}" = data.aws_subnet.subnet1_data.availability_zone
-    "${data.aws_subnet.subnet2.id}" = data.aws_subnet.subnet2_data.availability_zone
-    "${data.aws_subnet.subnet3.id}" = data.aws_subnet.subnet3_data.availability_zone
-    "${data.aws_subnet.subnet4.id}" = data.aws_subnet.subnet4_data.availability_zone
-    "${data.aws_subnet.subnet5.id}" = data.aws_subnet.subnet5_data.availability_zone
-    "${data.aws_subnet.subnet6.id}" = data.aws_subnet.subnet6_data.availability_zone
+    "${data.aws_subnet.subnet1.id}" = data.aws_subnet.subnet1.availability_zone
+    "${data.aws_subnet.subnet2.id}" = data.aws_subnet.subnet2.availability_zone
+    "${data.aws_subnet.subnet3.id}" = data.aws_subnet.subnet3.availability_zone
+    "${data.aws_subnet.subnet4.id}" = data.aws_subnet.subnet4.availability_zone
+    "${data.aws_subnet.subnet5.id}" = data.aws_subnet.subnet5.availability_zone
+    "${data.aws_subnet.subnet6.id}" = data.aws_subnet.subnet6.availability_zone
   }
 
   filtered_subnets = [
@@ -99,20 +74,17 @@ locals {
   ]
 }
 
-# Verificar se o cluster EKS já existe
 data "aws_eks_clusters" "existing_clusters" {}
 
 locals {
   cluster_exists = contains(data.aws_eks_clusters.existing_clusters.names, var.cluster_name)
 }
 
-# Data source para o cluster existente (se existir)
 data "aws_eks_cluster" "existing_cluster" {
   count = local.cluster_exists ? 1 : 0
   name  = var.cluster_name
 }
 
-# Criar o cluster apenas se não existir
 resource "aws_eks_cluster" "tech_eks_cluster" {
   count    = local.cluster_exists ? 0 : 1
   name     = var.cluster_name
@@ -131,15 +103,13 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
   }
 }
 
-# Usar o cluster correto dependendo se ele já existe ou foi criado
 locals {
-  cluster_name = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].name : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].name : var.cluster_name)
+  cluster_name     = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].name : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].name : var.cluster_name)
   cluster_endpoint = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].endpoint : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].endpoint : "")
 }
 
-# Verificar se o node group já existe
 data "aws_eks_node_groups" "existing_node_groups" {
-  count      = local.cluster_exists ? 1 : 0
+  count        = local.cluster_exists ? 1 : 0
   cluster_name = local.cluster_name
 }
 
@@ -147,7 +117,6 @@ locals {
   node_group_exists = local.cluster_exists ? contains(try(data.aws_eks_node_groups.existing_node_groups[0].names, []), "${var.project_name}-node-group") : false
 }
 
-# Criar o node group apenas se não existir
 resource "aws_eks_node_group" "tech_node_group" {
   count           = local.node_group_exists ? 0 : 1
   cluster_name    = local.cluster_name
@@ -169,10 +138,11 @@ resource "aws_eks_node_group" "tech_node_group" {
   }
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       scaling_config,
       tags,
     ]
   }
+
+  depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
