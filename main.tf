@@ -83,6 +83,13 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
     security_group_ids = [data.aws_security_group.eks_cluster_sg.id]
   }
 
+  tags = {
+    Environment = "Production"
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+    UpdatedAt   = "2025-03-24"
+  }
+
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
@@ -120,6 +127,13 @@ resource "aws_eks_node_group" "tech_node_group" {
     max_unavailable = 1
   }
 
+  tags = {
+    Environment = "Production"
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+    UpdatedAt   = "2025-03-24"
+  }
+
   lifecycle {
     ignore_changes = [
       scaling_config,
@@ -129,3 +143,5 @@ resource "aws_eks_node_group" "tech_node_group" {
 
   depends_on = [aws_eks_cluster.tech_eks_cluster]
 }
+
+
