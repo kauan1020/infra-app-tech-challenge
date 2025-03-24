@@ -42,6 +42,7 @@ data "aws_iam_role" "lab_role" {
   name = var.iam_role_name
 }
 
+# Usando data sources para todos os security groups existentes
 data "aws_security_group" "eks_cluster_sg" {
   name   = "${var.project_name}-eks-cluster-sg"
   vpc_id = data.aws_vpc.existing_vpc.id
@@ -54,20 +55,6 @@ data "aws_security_group" "eks_rds_sg" {
 
 data "aws_security_group" "postgres_sg" {
   id = var.postgres_sg_id
-}
-
-resource "aws_security_group_rule" "eks_to_postgres_sg" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  source_security_group_id = data.aws_security_group.eks_cluster_sg.id
-  security_group_id        = data.aws_security_group.postgres_sg.id
-  description              = "Allow PostgreSQL access from EKS cluster"
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 data "aws_subnet" "subnet1_data" {
@@ -112,7 +99,22 @@ locals {
   ]
 }
 
+# Verificar se o cluster EKS já existe
+data "aws_eks_clusters" "existing_clusters" {}
+
+locals {
+  cluster_exists = contains(data.aws_eks_clusters.existing_clusters.names, var.cluster_name)
+}
+
+# Data source para o cluster existente (se existir)
+data "aws_eks_cluster" "existing_cluster" {
+  count = local.cluster_exists ? 1 : 0
+  name  = var.cluster_name
+}
+
+# Criar o cluster apenas se não existir
 resource "aws_eks_cluster" "tech_eks_cluster" {
+  count    = local.cluster_exists ? 0 : 1
   name     = var.cluster_name
   role_arn = data.aws_iam_role.lab_role.arn
 
@@ -123,15 +125,32 @@ resource "aws_eks_cluster" "tech_eks_cluster" {
 
   lifecycle {
     ignore_changes = [
-      vpc_config.0.subnet_ids,
+      vpc_config,
       tags,
     ]
-    create_before_destroy = true
   }
 }
 
+# Usar o cluster correto dependendo se ele já existe ou foi criado
+locals {
+  cluster_name = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].name : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].name : var.cluster_name)
+  cluster_endpoint = local.cluster_exists ? data.aws_eks_cluster.existing_cluster[0].endpoint : (length(aws_eks_cluster.tech_eks_cluster) > 0 ? aws_eks_cluster.tech_eks_cluster[0].endpoint : "")
+}
+
+# Verificar se o node group já existe
+data "aws_eks_node_groups" "existing_node_groups" {
+  count      = local.cluster_exists ? 1 : 0
+  cluster_name = local.cluster_name
+}
+
+locals {
+  node_group_exists = local.cluster_exists ? contains(try(data.aws_eks_node_groups.existing_node_groups[0].names, []), "${var.project_name}-node-group") : false
+}
+
+# Criar o node group apenas se não existir
 resource "aws_eks_node_group" "tech_node_group" {
-  cluster_name    = aws_eks_cluster.tech_eks_cluster.name
+  count           = local.node_group_exists ? 0 : 1
+  cluster_name    = local.cluster_name
   node_group_name = "${var.project_name}-node-group"
   node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = local.filtered_subnets
@@ -151,13 +170,8 @@ resource "aws_eks_node_group" "tech_node_group" {
 
   lifecycle {
     ignore_changes = [
-      scaling_config.0.desired_size,
+      scaling_config,
       tags,
     ]
-    create_before_destroy = true
   }
-
-  depends_on = [
-    aws_eks_cluster.tech_eks_cluster
-  ]
 }
