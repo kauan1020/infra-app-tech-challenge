@@ -169,13 +169,10 @@ resource "aws_eks_node_group" "tech_node_group" {
   }
 
   lifecycle {
+    prevent_destroy = true
     ignore_changes = [
       scaling_config,
       tags,
     ]
   }
-}
-
-lifecycle {
-  prevent_destroy = true
 }
